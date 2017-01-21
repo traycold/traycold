@@ -15,7 +15,7 @@ parchment_options = {
 };
 window.onpopstate = function(event) {
   var saveState = document.location.hash;
-  var story = document.location.search.substr(document.location.search.lastIndexOf("/"));
+  var story = document.location.search.substr(document.location.search.lastIndexOf("/")+1);
   console.log("story:"+story+" - saveState length:"+saveState.length);
 };
 </script>
