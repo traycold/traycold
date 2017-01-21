@@ -13,14 +13,19 @@
 parchment_options = {
     panels: [ 'about' , 'url']
 };
+window.onpopstate = function(event) {
+  var saveState = document.location.hash;
+  var story = document.location.search.substr(document.location.search.lastIndexOf("/"));
+  console.log("story:"+story+" - saveState length:"+saveState.length);
+};
 </script>
 	<div id="about">
 		<h1>Parchment</h1>
 		<p>is an interpreter for Interactive Fiction. <a href="http://parchment.googlecode.com">Find out more.</a></p>
 		<noscript><p>Parchment requires Javascript. Please enable it in your browser.</p></noscript>
 		<ul style="list-style-type: none; padding:0; margin:0">
-		<li><a href="/?story=stories/volonta2.z5">La volontà dei morti</a></li>
-		<li><a href="/?story=stories/vita.z5">La vita? Non venitemi a parlare della vita</a></li>
+		<li><a href="?story=stories/volonta2.z5">La volontà dei morti</a></li>
+		<li><a href="?story=stories/vita.z5">La vita? Non venitemi a parlare della vita</a></li>
 		</ul>
 	</div>	
 	<div id="parchment"></div>
