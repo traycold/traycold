@@ -39,8 +39,10 @@
     <div class='col-12'>
       <p>
         Numero campioni orari: <b id="totalSamples"></b><br>
-        Periodo misure da: <b id="minDate"></b> a <b id="maxDate"></b>
+        Periodo misure da: <b id="minDate"></b> a <b id="maxDate"></b><br>
         Consumo totale (KWh): <b id="totalConsumption"></b><br>
+        Consumo medio giornaliero (KWh): <b id="avgConsumptionDay"></b><br>
+        Consumo medio giornaliero (Wh): <b id="avgConsumptionHour"></b>
       </p> 
     </div>
   </div>
@@ -165,6 +167,8 @@ d3.json("https://dl.dropboxusercontent.com/s/jrewnge7jrgevn7/measure.json").then
   document.getElementById('totalConsumption').innerHTML = roundKWh(totalConsumption);
   document.getElementById('minDate').innerHTML = moment(data[0].dt).format('DD/MM/YYYY');
   document.getElementById('maxDate').innerHTML = moment(data[data.length-1].dt).format('DD/MM/YYYY');
+  document.getElementById('avgConsumptionDay').innerHTML = roundKWh(totalConsumption/data.length*24);
+  document.getElementById('avgConsumptionHour').innerHTML = Math.round(totalConsumption/data.length*10)/10;
 
 
 
