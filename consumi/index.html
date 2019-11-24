@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta content='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0' name='viewport'>  
+
+  <title>Consumi elettrici</title>
+
+  <script src='date-holiday.min.js' type='text/javascript'></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js" integrity="sha256-4iQZ6BVL4qNKlQ27TExEhBN1HFPvAvAMbFavKKosSWQ=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/locale/it.js" integrity="sha256-D8y560ZGsKY1LoAajKkQCG7y0Vkye361MH4yFv2K5kk=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.12.0/d3.min.js" integrity="sha256-+9Mf3cAVmxxudDsr1XwXUeRZFtvdWVYdq5/vcgiYyNU=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-tip/0.9.1/d3-tip.min.js" integrity="sha256-DCW2G+HXRTaX80n/cuqXdLtWpE59kVHmSBzwPRBHe/o=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crossfilter/1.3.12/crossfilter.min.js" integrity="sha256-T9tvV3x+/vCnCoFciKNZwbaJ46q9lh6iZjD0ZjD95lE=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dc/3.1.5/dc.min.js" integrity="sha256-qOsGeuXFGc2IDCqCuitXWLLbejbSxXX87qts9xZzrSE=" crossorigin="anonymous"></script>
+
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dc/3.1.5/dc.min.css" integrity="sha256-JxxmFZJjSBxxAjCludgb7ZMDLq9++jCr5pSVyoQLo2s=" crossorigin="anonymous" />
+
+  <style type="text/css">
+        div.dc-chart {
+            float: left;
+        }
+  </style>
+</head>
+
+<body>
+
+<div class='container-fluid' id='main-container'>
+
+  <div class='row'>
+    <div>
+      <h1>Consumi elettrici</h1>
+    </div>
+  </div>
+
+  <div class='row'>
+    <div class='col-12'>
+      <p>
+        Numero campioni orari: <b id="totalSamples"></b><br>
+        Periodo misure da: <b id="minDate"></b> a <b id="maxDate"></b>
+        Consumo totale (KWh): <b id="totalConsumption"></b><br>
+      </p> 
+    </div>
+  </div>
+
+  <div class='row'>
+    <div class='col-xs-12 col-md-5' id='dc-dayHour-chart'>
+      <strong>Consumi medi orari per ora del giorno [KWh]</strong>
+      <div class="clearfix"></div>
+    </div>
+    <div class='col-md-1'></div>
+    <div class='col-xs-12 col-md-5' id='dc-weekDay-chart'>
+    <strong>Consumi medi giornalieri per giorno della settimana [KWh]</strong>
+      <a class="reset" href="javascript:weekDayChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+      <div class="clearfix"></div>
+    </div>    
+  </div>
+
+  <div class='row mt-4'>
+    <div class='col-xs-12 col-md-5' id='dc-timeSlot-chart'>
+      <strong>Consumi per fascia oraria [%]</strong>
+      <a class="reset" href="javascript:timeSlotChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+      <div class="clearfix"></div>
+    </div>
+    <div class='col-md-1'></div>
+    <div class='col-xs-12 col-md-5' id='dc-day-chart'>
+      <strong>Consumi giornalieri [KWh]</strong>
+      <div class="clearfix"></div>
+    </div>    
+  </div>
+
+  <div class='row mt-4'>
+    <div class='col-xs-12 col-md-11' style='width:100%' id='dc-time-chart'>
+      <strong>Consumi orari</strong>
+      <div class="clearfix"></div>
+    </div>
+  </div>
+
+  <div class='row mt-4'>
+	<div class='col-xs-12 col-md-11'>
+      <table class='table table-hover' id='dc-table-graph'>
+        <thead>
+          <tr class='header'>
+            <th>Data/Ora</th>
+            <th>Consumo [W]</th>
+          </tr>
+        </thead>
+      </table>
+	</div>
+  </div>
+
+</div>
+  
+<script>
+  
+/**********************************
+* Step0: Load data from json file *
+**********************************/
+
+var unix01012019 = moment('01/01/2019','DD/MM/YYYY').unix();
+var info = {};
+var roundKWh = function(wh){return Math.round(wh/100)/10};
+
+/******************************************************
+* Step1: Create the dc.js chart objects & ling to div *
+******************************************************/
+
+  var dayHourChart = dc.barChart("#dc-dayHour-chart");
+  //var weekDayChart = dc.barChart("#dc-weekDay-chart");
+  var weekDayChart = dc.rowChart("#dc-weekDay-chart");
+  var timeSlotChart = dc.rowChart("#dc-timeSlot-chart");
+  var dayChart = dc.barChart("#dc-day-chart");
+  var timeChart = dc.lineChart("#dc-time-chart");
+  var dataTable = dc.dataTable("#dc-table-graph");
+
+// load data from a csv file
+d3.json("https://dl.dropboxusercontent.com/s/jrewnge7jrgevn7/measure.json").then(function (data) {
+
+  var hd = new Holidays('IT');
+
+  var holidayCache = {};
+
+  var res = [];
+  var index = 0;
+  var totalConsumption = 0;
+  var totalConsumptionBySlot = [0, 0, 0, 0];
+
+  data.body.forEach( block => {
+    var blockStart = moment.unix(block.beg_time);
+    block.value.forEach( (value,idx) => {
+      var sampleDt = moment(blockStart).add(block.step_time * idx,'seconds');
+      var timeSlot;
+      var formattedDate = sampleDt.format('YYYYMMDD');
+      var isHoliday = holidayCache[formattedDate];
+      if(isHoliday===undefined){
+        isHoliday = hd.isHoliday(sampleDt.toDate());
+        holidayCache[formattedDate] = isHoliday;
+      }
+      if(isHoliday || sampleDt.day()==0 || [0, 1, 2, 3, 4, 5, 6, 23].includes(sampleDt.hour())) 
+        timeSlot = 3;
+      else if(sampleDt.hour()>7 && sampleDt.hour()<19 && sampleDt.day()!=6)
+        timeSlot = 1;
+      else
+        timeSlot = 2;
+
+      res.push({
+        idx: index++,
+        dt: sampleDt.toDate(),
+        hour: sampleDt.hour(),
+        day: (sampleDt.startOf('day').unix()-unix01012019)/86400,
+        weekday: sampleDt.weekday(),
+        timeSlot: timeSlot,
+        val: value[0]
+      });
+      totalConsumption += value[0];
+      totalConsumptionBySlot[timeSlot] += value[0];
+    })
+  })
+  
+  data = res;
+
+  document.getElementById('totalSamples').innerHTML = data.length;
+  document.getElementById('totalConsumption').innerHTML = roundKWh(totalConsumption);
+  document.getElementById('minDate').innerHTML = moment(data[0].dt).format('DD/MM/YYYY');
+  document.getElementById('maxDate').innerHTML = moment(data[data.length-1].dt).format('DD/MM/YYYY');
+
+
+
+/****************************************
+* 	Run the data through crossfilter    *
+****************************************/
+
+  var facts = crossfilter(data);  // Gets our 'facts' into crossfilter
+
+/******************************************************
+* Create the Dimensions                               *
+* A dimension is something to group or filter by.     *
+* Crossfilter can filter by exact value, or by range. *
+******************************************************/
+
+  // for hour of day
+  var dayHourValue = facts.dimension(function (d) {
+    return d.hour;       
+  });
+
+//  var dayHourValueGroupSum = dayHourValue.group()
+//    .reduceSum(function(d) { return d.val; });
+//
+//  var dayHourValueGroupCount = dayHourValue.group()
+//    .reduceCount(function(d) { return d.val; }).all();
+
+  var dayHourValueGroupAverage = dayHourValue.group().reduce(
+		function (p, v) { //add
+        ++p.count;
+        p.total += v.val;
+        return p;
+    },
+    function (p, v) {  //remove
+	    --p.count;
+	    p.total -= v.val;
+	    return p;
+    },
+    function () {  //initial
+      return {
+          count: 0,
+          total: 0
+      };
+		}    
+  );
+
+  // for week day
+  var weekDayValue = facts.dimension(function (d) {
+    return d.weekday;       
+  });
+  var weekDayValueGroupAverage = weekDayValue.group().reduce(
+		function (p, v) { //add
+        ++p.count;
+        p.total += v.val;
+        return p;
+    },
+    function (p, v) {  //remove
+	    --p.count;
+	    p.total -= v.val;
+	    return p;
+    },
+    function () {  //initial
+      return {
+          count: 0,
+          total: 0
+      };
+		}    
+  );
+
+  // for time slot
+  var timeSlotValue = facts.dimension(function (d) {
+    return d.timeSlot;       
+  });
+  var timeSlotValueGroupAverage = timeSlotValue.group().reduce(
+    function (p, v) { //add
+        ++p.count;
+        p.total += v.val;
+        return p;
+    },
+    function (p, v) {  //remove
+      --p.count;
+      p.total -= v.val;
+      return p;
+    },
+    function () {  //initial
+      return {
+          count: 0,
+          total: 0
+      };
+    }    
+  );  
+
+  // For datatable
+  var timeDimension = facts.dimension(function (d) {
+    return d.dt;
+  }); // group or filter by time
+
+  // for day
+  var dayValue = facts.dimension(function (d) {
+    return d.day;
+  });
+  var dayValueGroup = dayValue.group().reduce(function(p, v) {
+      p[v.timeSlot] = (p[v.timeSlot] || 0) + v.val/1000;
+      return p;
+  }, function(p, v) {
+      p[v.timeSlot] = (p[v.timeSlot] || 0) - v.val/1000;
+      return p;
+  }, function() {
+      return {};
+  });
+  
+  // define a daily volume Dimension
+  var volumeByDay = facts.dimension(function(d) {
+    return d3.timeHour(d.dt);
+  });
+  // map/reduce to group sum
+  var volumeByDayGroup = volumeByDay.group()
+    .reduceSum(function(d) { return d.val; });
+
+/***************************************
+* 	Step4: Create the Visualisations   *
+***************************************/
+  
+  // Hour of day Bar Graph Summed
+  dayHourChart
+    //.width(480).height(250)
+    .margins({top: 10, right: 10, bottom: 20, left: 30})
+    .dimension(dayHourValue)								// the values across the x axis
+    .group(dayHourValueGroupAverage)							// the values on the y axis
+	  .transitionDuration(500)
+    .centerBar(true)	
+	  .gap(5)
+    .x(d3.scaleLinear().domain([-0.5, 23.5]))
+  	.elasticY(true)
+    .brushOn(false)
+    .valueAccessor(function (d) {
+			return roundKWh(d.value.total/d.value.count);
+		})
+    .title(function(d){return 'value: '+d.value.total/d.value.count+'\ntotal: '+d.value.total+'\ncount: '+d.value.count})
+  	.xAxis().ticks(24);
+
+  // Day of week Bar Graph Summed
+  var remove_empty_bins = function(source_group) {
+      return {
+          all:function () {
+              return source_group.all().filter(function(d) {
+                  return d.value.count != 0;
+              });
+          }
+      };
+  }
+  weekDayChart
+    //.width(480).height(250)
+    .margins({top: 10, right: 10, bottom: 20, left: 10})
+    .dimension(weekDayValue)                // the values across the x axis
+    .group(remove_empty_bins(weekDayValueGroupAverage))              // the values on the y axis
+    .transitionDuration(500)
+    .valueAccessor(function (d) {
+      return roundKWh(24*d.value.total/d.value.count);
+    })
+    .label(function (d) {
+      return moment().weekday(d.key).format('dddd');
+    })
+    .ordinalColors(['#99ccff','#66b3ff','#3399ff','#0080ff','#0066cc','#004d99','#003366'])
+    .title(function(d){return 'value: '+24*d.value.total/d.value.count+'\ntotal: '+d.value.total+'\ncount: '+d.value.count})
+    .elasticX(true);
+
+  timeSlotChart
+    //.width(480).height(250)
+    .margins({top: 10, right: 10, bottom: 20, left: 10})
+    .dimension(timeSlotValue)                // the values across the x axis
+    .group(timeSlotValueGroupAverage)              // the values on the y axis
+    .transitionDuration(500)
+    .valueAccessor(function (d) {
+      return Math.round(d.value.total*1000/totalConsumption)/10;
+    })
+    .label(function (d) {
+      return "F"+d.key;
+    })
+    .ordinalColors(['#1f77b4', '#ff7f0e', '#2ca02c'])
+    .title(function(d){return roundKWh(d.value.total)+" KW ("+Math.round(d.value.total*1000/totalConsumption)/10+"%)"})
+    .elasticX(true);
+
+  // Day bar graph
+  function sel_stack(valueKey) {
+    return function(d) {
+      return d.value[valueKey];
+    };
+  }  
+  var dayExtent = d3.extent(data, function(d){return d.day});
+  dayExtent[0] -= 0.5;
+  dayExtent[1] += 0.5;
+  dayChart.width(480)
+    .height(250)
+    .margins({top: 10, right: 10, bottom: 40, left: 40})
+    .dimension(dayValue)
+    .group(dayValueGroup,"1",sel_stack(1))
+	  .transitionDuration(500)
+    .centerBar(true)	
+	  .gap(5)
+    .x(d3.scaleLinear().domain(dayExtent))
+	  .elasticY(true)
+    .brushOn(false)
+    .title(function(d){
+      return moment.unix(unix01012019+d.key*86400).format('ddd DD/MM') + ' - F' + this.layer + ': ' + Math.round(d.value[this.layer]*10)/10+' KWh (' + Math.round(d.value[this.layer]*1000/((d.value["1"]||0)+(d.value["2"]||0)+(d.value["3"]||0)))/10+"%)";
+    })
+	  .xAxis().tickFormat(function(v){return moment.unix(unix01012019+v*86400).format('DD/MM')});
+  for(var i = 2; i<4; ++i)
+    dayChart.stack(dayValueGroup, ''+i, sel_stack(i));
+  dayChart.legend(dc.legend().x(180).y(230).horizontal(true).legendText(function(d, i) {return "F"+d.name}));
+
+  // time graph
+  timeChart
+    //.width(960).height(200)
+    .margins({top: 10, right: 10, bottom: 20, left: 40})
+    .dimension(volumeByDay)
+    .group(volumeByDayGroup)
+    .transitionDuration(500)
+	  .elasticY(true)
+    .x(d3.scaleTime().domain(d3.extent(data, function(d){return d.dt}))) // scale and domain of the graph
+    .xAxis();
+
+  // Table of earthquake data
+  dataTable.width(960).height(800)
+    .dimension(timeDimension)
+    .group(function(d){return "maggiori consumi nel range selezionato"})
+  	.size(10)							// number of rows to return
+    .columns([
+      function(d) { return moment(d.dt).format('DD/MM/YYYY HH:00'); },
+      function(d) { return d.val; }
+    ])
+    .sortBy(function(d){ return d.val; })
+    .order(d3.descending);
+
+/****************************
+* Step6: Render the Charts  *
+****************************/
+			
+  dc.renderAll();
+  
+});
+  
+</script>
+    
+</body>
+</html>
