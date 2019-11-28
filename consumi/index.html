@@ -40,7 +40,7 @@
         Periodo misure da: <b id="minDate"></b> a <b id="maxDate"></b><br>
         Consumo totale (KWh): <b id="totalConsumption"></b><br>
         Consumo medio giornaliero (KWh): <b id="avgConsumptionDay"></b><br>
-        Consumo medio giornaliero (Wh): <b id="avgConsumptionHour"></b>
+        Consumo medio orario (Wh): <b id="avgConsumptionHour"></b>
       </p> 
     </div>
   </div>
@@ -343,7 +343,7 @@ var run = function(){
         return moment().weekday(d.key).format('dddd');
       })
       .ordinalColors(['#99ccff','#66b3ff','#3399ff','#0080ff','#0066cc','#004d99','#003366'])
-      .title(function(d){return roundKWh(d.value.total/Object.keys(d.value.days).length)+' KWh (#: '+d.value.count+')'})
+      .title(function(d){return roundKWh(d.value.total/Object.keys(d.value.days).length)+' KWh (#: '+Math.round(d.value.count/24)+')'})
       .elasticX(true);
 
     charts['timeSlotChart']
